@@ -1,9 +1,4 @@
 # -*- coding: utf-8 -*-
-"""Elements that will constitute the parse tree of a query.
-
-You may use these items to build a tree representing a query,
-or get a tree as the result of parsing a query string.
-"""
 import re
 from decimal import Decimal
 
@@ -11,35 +6,9 @@ _MARKER = object()
 
 
 class Item(object):
-    """Base class for all items that compose the parse tree.
 
-    An item is a part of a request.
 
-    :param int pos: position of element in orginal text (not accounting for head)
-    :param int size: size of element in orginal text (not accounting for head and tail)
-    :param str head: non meaningful text before this element
-    :param str tail: non meaningful text after this element
-    """
-
-    # /!\ Note on Item (and subclasses) __magic__ methods: /!\
-    #
-    # Since we're dealing with recursive structures, we must avoid using
-    # the builtin helper methods when dealing with nested objects in
-    # __magic__ methods.
-    #
-    # As the helper usually calls the relevant method, we end up with two
-    # function calls instead of one, and end up hitting python's max recursion
-    # limit twice as fast!
-    #
-    # This is why we're calling c.__repr__ instead of repr(c) in the __repr__
-    # method. Same thing applies for all magic methods (__str__, __eq__, and any
-    # other we might add in the future).
-
-    #: this attribute permits to list attributes that participate in telling equality of two item
-    #: this excludes children (for generic `__eq__` methode will already recursively compare them)
     _equality_attrs = []
-    #: this attribute permits to list attributes that defines the children.
-    #: Order is important.
     _children_attrs = []
 
     def __init__(self, pos=None, size=None, head="", tail=""):
@@ -49,55 +18,21 @@ class Item(object):
         self.tail = tail
 
     def clone_item(self, **kwargs):
-        """clone an item, but not its children !
-
-        This is particularly useful for the :py:class:`.visitor.TreeTransformer` pattern.
-
-        :param dict kwargs: those item will be added to `__init__` call.
-            It's a simple way to change some values of target item.
-        """
-        return self._clone_item(cls=type(self), **kwargs)
+        pass
 
     def _clone_item(self, cls, *args, **kwargs):
-        """internal implementation of clone_item (for specific sub classes tweaks)
-
-        :param type cls: the new class
-        """
-        attrs = {"pos": self.pos, "size": self.size, "head": self.head, "tail": self.tail}
-        # we can _equality_attrs as they normally correspond to what we need to copy
-        attrs.update((attr_name, getattr(self, attr_name)) for attr_name in self._equality_attrs)
-        # use NoneItem for children using _children_attrs
-        attrs.update((attr_name, NONE_ITEM) for attr_name in self._children_attrs)
-        # add optional kwargs
-        attrs.update(**kwargs)
-        return cls(*args, **attrs)
+        pass
 
     @property
     def children(self):
-        """As base of a tree structure, an item may have children"""
-        return [getattr(self, attr) for attr in self._children_attrs]
+        pass
 
     @children.setter
     def children(self, value):
-        """generic setter for children.
-
-        Having a setter for children in useful for generic manipulations
-        like in :py:mod:`luqum.visitor`
-        """
-        if len(value) != len(self._children_attrs):
-            num_children = len(value) if value else "no"
-            raise ValueError(
-                f"{type(self)} accepts {num_children} children,"
-                f" and you try to set {len(value)} children"
-            )
-        for attr, v in zip(self._children_attrs, value):
-            setattr(self, attr, v)
+        pass
 
     def _head_tail(self, value, head_tail):
-        if head_tail:
-            return self.head + value + self.tail
-        else:
-            return value
+        pass
 
     def span(self, head_tail=False):
         """return (start, end) position of this element in global expression.
@@ -133,27 +68,15 @@ class Item(object):
 
 
 class NoneItem(Item):
-    """This Item is a place holder, think to it as None.
-
-    It can be used, eg. to initialize an element childrens, until we feed in the real children.
-    """
 
     def __str__(self, head_tail=False):
         return ""
 
 
-#: an instanciation of NoneItem, as it is always the same
 NONE_ITEM = NoneItem()
 
 
 class SearchField(Item):
-    """Indicate wich field the search expression operates on
-
-    eg: *desc* in ``desc:(this OR that)``
-
-    :param str name: name of the field
-    :param expr: the searched expression
-    """
     _equality_attrs = ['name']
     _children_attrs = ["expr"]
 
@@ -171,10 +94,6 @@ class SearchField(Item):
 
 
 class BaseGroup(Item):
-    """Base class for group of expressions or field values
-
-    :param expr: the expression inside parenthesis
-    """
     _children_attrs = ["expr"]
 
     def __init__(self, expr, **kwargs):
@@ -187,27 +106,18 @@ class BaseGroup(Item):
 
 
 class Group(BaseGroup):
-    """Group sub expressions
-    """
+    pass
 
 
 class FieldGroup(BaseGroup):
-    """Group values for a query on a field
-    """
+    pass
 
 
 def group_to_fieldgroup(g):
-    return FieldGroup(g.expr, pos=g.pos, size=g.size, head=g.head, tail=g.tail)
+    pass
 
 
 class Range(Item):
-    """A Range
-
-    :param low: lower bound
-    :param high: higher bound
-    :param bool include_low: wether lower bound is included
-    :param bool include_high: wether higher bound is included
-    """
 
     LOW_CHAR = {True: '[', False: '{'}
     HIGH_CHAR = {True: ']', False: '}'}
@@ -232,14 +142,7 @@ class Range(Item):
 
 
 class Term(Item):
-    """Base for terms
-
-    :param str value: the value
-    """
     WILDCARDS_PATTERN = re.compile(r"((?<=[^\\])[?*]|\\\\[?*]|^[?*])")  # non escaped * and ?
-    # Although the following URL lists [+\-&|!(){}[\]^"~*?:\\] as escaped characters, in
-    # practice, in Lucene, all escaped letters are interpreted as a literal, i.e. '\a' == 'a'
-    # https://lucene.apache.org/core/3_6_0/queryparsersyntax.html#Escaping%20Special%20Characters
     WORD_ESCAPED_CHARS = re.compile(r'\\(.)')
 
     _equality_attrs = ['value']
@@ -250,13 +153,10 @@ class Term(Item):
 
     @property
     def unescaped_value(self):
-        # remove '\' that escape characters
-        return self.WORD_ESCAPED_CHARS.sub(r'\1', self.value)
+        pass
 
     def is_wildcard(self):
-        """:return bool: True if value is the wildcard ``*``
-        """
-        return self.value == "*"
+        pass
 
     def iter_wildcards(self):
         """list wildcards contained in value and their positions
@@ -265,9 +165,7 @@ class Term(Item):
             yield matched.span(), matched.group()
 
     def split_wildcards(self):
-        """split term on wildcards
-        """
-        return self.WILDCARDS_PATTERN.split(self.value)
+        pass
 
     def has_wildcard(self):
         """:return bool: True if value contains a wildcards
@@ -283,17 +181,10 @@ class Term(Item):
 
 
 class Word(Term):
-    """A single word term
-
-    :param str value: the value
-    """
+    pass
 
 
 class Phrase(Term):
-    """A phrase term, that is a sequence of words enclose in quotes
-
-    :param str value: the value, including the quotes. Eg. ``'"my phrase"'``
-    """
     def __init__(self, value, **kwargs):
         super(Phrase, self).__init__(value, **kwargs)
         assert self.value.endswith('"') and self.value.startswith('"'), (
@@ -301,10 +192,6 @@ class Phrase(Term):
 
 
 class Regex(Term):
-    """A regex term, that is a sequence of words enclose in slashes
-
-    :param str value: the value, including the slashes. Eg. ``'/my regex/'``
-    """
     def __init__(self, value, **kwargs):
         super(Regex, self).__init__(value, **kwargs)
         assert value.endswith('/') and value.startswith('/'), (
@@ -312,8 +199,6 @@ class Regex(Term):
 
 
 class BaseApprox(Item):
-    """Base for approximations, that is fuzziness and proximity
-    """
     _equality_attrs = ['degree']
     _children_attrs = ["term"]
 
@@ -335,38 +220,17 @@ class BaseApprox(Item):
 
 
 class Fuzzy(BaseApprox):
-    """Fuzzy search on word
-
-    :param Word term: the approximated term
-    :param degree: the degree which will be converted to :py:class:`decimal.Decimal`.
-    """
     def _normalize_degree(self, degree):
-        if degree is None:
-            degree = 0.5
-        if not isinstance(degree, Decimal):
-            degree = Decimal(degree).normalize()
-        return degree
+        pass
 
 
 class Proximity(BaseApprox):
-    """Proximity search on phrase
-
-    :param Phrase term: the approximated phrase
-    :param degree: the degree which will be converted to :py:func:`int`.
-    """
 
     def _normalize_degree(self, degree):
-        if degree is None:
-            degree = 1
-        return int(degree)
+        pass
 
 
 class Boost(Item):
-    """A term for boosting a value or a group there of
-
-    :param expr: the boosted expression
-    :param force: boosting force, will be converted to :py:class:`decimal.Decimal`
-    """
     _equality_attrs = ['force']
     _children_attrs = ["expr"]
 
@@ -386,12 +250,6 @@ class Boost(Item):
 
 
 class BaseOperation(Item):
-    """
-    Parent class for binary operations are binary operation used to join expressions,
-    like OR and AND
-
-    :param operands: expressions to apply operation on
-    """
 
     def __init__(self, *operands, **kwargs):
         self.operands = operands
@@ -403,83 +261,34 @@ class BaseOperation(Item):
 
     @property
     def children(self):
-        """children are left and right expressions
-        """
-        return self.operands
+        pass
 
     @children.setter
     def children(self, value):
-        """Generic setter for children
-
-        :param iterable value: operands
-        """
-        self.operands = tuple(value)
+        pass
 
 
 class BoolOperation(BaseOperation):
-    """Lucene Boolean Query.
-
-    This operation assumes that the query builder can utilize a boolean operator
-    with three possible sections, must, should and must_not. If the
-    UnknownOperationResolver is asked to resolve_to this operation, the query
-    builder can utilize this operator directly instead of nested AND/OR.
-    This also makes it possible to correctly support Lucene queries such as:
-    "apples +bananas -vegetables".
-
-    .. seealso::
-        the :py:class:`.utils.UnknownOperationResolver`
-    """
     op = ""
 
 
 class UnknownOperation(BaseOperation):
-    """Unknown Boolean operator.
-
-    .. warning::
-        This is used to represent implicit operations (ie: term:foo term:bar),
-        as we cannot know for sure which operator should be used.
-
-        Lucene seem to use whatever operator was used before reaching that one,
-        defaulting to AND, but we cannot know anything about this at parsing
-        time...
-    .. seealso::
-        the :py:class:`.utils.UnknownOperationResolver` to resolve those nodes to OR and AND
-    """
     op = ''
 
 
 class OrOperation(BaseOperation):
-    """OR expression
-    """
     op = 'OR'
 
 
 class AndOperation(BaseOperation):
-    """AND expression
-    """
     op = 'AND'
 
 
 def create_operation(cls, a, b, op_tail=" "):
-    """Create operation between a and b, merging if a or b is already an operation of same class
-
-    :param a: left operand
-    :param b: right operand
-    :param op_tail: tail of operation token
-    """
-    operands = []
-    operands.extend(a.operands if isinstance(a, cls) else [a])
-    left_operands = b.operands if isinstance(b, cls) else [b]
-    left_operands[0].head += op_tail
-    operands.extend(left_operands)
-    return cls(*operands)
+    pass
 
 
 class Unary(Item):
-    """Parent class for unary operations
-
-    :param a: the expression the operator applies on
-    """
     _children_attrs = ["a"]
 
     def __init__(self, a, **kwargs):
@@ -492,13 +301,10 @@ class Unary(Item):
 
 
 class UnaryOperator(Unary):
-    """Base class for unary operators"""
     pass
 
 
 class Plus(UnaryOperator):
-    """plus, unary operation
-    """
     op = "+"
 
 
@@ -507,17 +313,10 @@ class Not(UnaryOperator):
 
 
 class Prohibit(UnaryOperator):
-    """The negation
-    """
     op = "-"
 
 
 class OpenRange(Unary):
-    """A range with only one bound.
-
-    :param a: the provided bound value
-    :param bool include: whether a is included
-    """
 
     _char = {True: '=', False: ''}
     _equality_attrs = ['include']

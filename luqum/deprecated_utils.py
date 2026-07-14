@@ -1,7 +1,3 @@
-"""Deprecated visitor helper classes.
-
-see :py:mod:`luqum.visitor` for newer implementations
-"""
 
 import warnings
 
@@ -9,22 +5,6 @@ from .visitor import camel_to_lower
 
 
 class LuceneTreeVisitor:
-    """
-    Tree Visitor base class, inspired by python's :class:`ast.NodeVisitor`.
-
-    This class is meant to be subclassed, with the subclass implementing
-    visitor methods for each Node type it is interested in.
-
-    By default, those visitor method should be named ``'visit_'`` + class
-    name of the node, converted to lower_case (ie: visit_search_node for a
-    SearchNode class).
-
-    You can tweak this behaviour by overriding the `visitor_method_prefix` &
-    `generic_visitor_method_name` class attributes.
-
-    If the goal is to modify the initial tree,
-    use :py:class:`LuceneTreeTranformer` instead.
-    """
     visitor_method_prefix = 'visit_'
     generic_visitor_method_name = 'generic_visit'
 
@@ -64,23 +44,10 @@ class LuceneTreeVisitor:
             yield from self.visit(child, parents + [node])
 
     def generic_visit(self, node, parents=None):
-        """
-        Default visitor function, called if nothing matches the current node.
-        """
-        return iter([])  # No-op
+        pass
 
 
 class LuceneTreeTransformer(LuceneTreeVisitor):
-    """
-    A :class:`LuceneTreeVisitor` subclass that walks the abstract syntax tree
-    and allows modifications of traversed nodes.
-
-    The `LuceneTreeTransormer` will walk the AST and use the return value of the
-    visitor methods to replace or remove the old node. If the return value of
-    the visitor method is ``None``, the node will be removed from its location,
-    otherwise it is replaced with the return value. The return value may be the
-    original node, in which case no replacement takes place.
-    """
 
     def replace_node(self, old_node, new_node, parent):
         for k, v in parent.__dict__.items():  # pragma: no branch
@@ -111,7 +78,7 @@ class LuceneTreeTransformer(LuceneTreeVisitor):
                     pass  # this was not the attribute containing old_node
 
     def generic_visit(self, node, parent=None):
-        return node
+        pass
 
     def visit(self, node, parents=None):
         """
@@ -135,25 +102,6 @@ class LuceneTreeTransformer(LuceneTreeVisitor):
 
 
 class LuceneTreeVisitorV2(LuceneTreeVisitor):
-    """
-    V2 of the LuceneTreeVisitor allowing to evaluate the AST
-
-    It differs from py:cls:`LuceneTreeVisitor`
-    because it's up to the visit method to recursively call children (or not)
-
-    This class is meant to be subclassed, with the subclass implementing
-    visitor methods for each Node type it is interested in.
-
-    By default, those visitor method should be named ``'visit_'`` + class
-    name of the node, converted to lower_case (ie: visit_search_node for a
-    SearchNode class).
-
-    You can tweak this behaviour by overriding the `visitor_method_prefix` &
-    `generic_visitor_method_name` class attributes.
-
-    If the goal is to modify the initial tree,
-    use :py:class:`LuceneTreeTranformer` instead.
-    """
 
     def visit(self, node, parents=None, context=None):
         """ Basic, recursive traversal of the tree.
